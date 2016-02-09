@@ -1,0 +1,59 @@
+#!/bin/sh
+#
+# This file is part of OpenMediaVault.
+#
+# @license   http://www.gnu.org/licenses/gpl.html GPL Version 3
+# @author    Jason Lo <jasonl@polywell.com>
+#
+# OpenMediaVault is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# any later version.
+#
+# OpenMediaVault is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with OpenMediaVault. If not, see <http://www.gnu.org/licenses/>.
+
+set -e
+
+. /etc/default/openmediavault
+. /usr/share/openmediavault/scripts/helper-functions
+
+OMV_LDAPUSER=${OMV_LDAP_USER:-"openldap"}
+OMV_LDAPGROUP=${OMV_LDAP_GROUP:-"openldap"}
+OMV_LDAP_DB_DIR=${OMV_LDAP_DB_DIR:-"/var/lib/ldap"}
+OMV_SLAPD_CONF_DIR=${OMV_SlAPD_CONF_DIR:-"/etc/ldap/slapd.d"}
+OMV_DEFAULT_BASEDN=${OMV_DEFAULT_BASEDN:="dc=mynet,dc=local"}
+OMV_DEFAULT_BINDDN=${OMV_DEFAULT_BINDCN:="cn=admin,dc=mynet,dc=local"}
+OMV_DEFAULT_BACKEND=${OMV_DEFAULT_BACKEND:="hdb"}
+OMV_DEFAULT_BACKENDOBJECTCLASS=${OMV_DEFAULT_BACKENDOBJECTCLASS:="olcHdbConfig"}
+OMV_DEFAULT_PASSWORD=${OMV_DEFAULT_PASSWORD:="password"}
+
+service slapd stop
+rm -rf ${OMV_LDAP_DB_DIR}/* ${OMV_SLAPD_CONF_DIR}/cn=config ${OMV_SLAPD_CONF_DIR}/cn=config.ldif
+
+#setup the slap.d default config
+mkdir -p ${OMV_SLAPD_CONF_DIR}
+initldif=`mktemp -t slapadd.XXXXXX`
+cat /usr/share/slapd/slapd.init.ldif > ${initldif}
+
+#change initldif to OMV defaults
+sed -i -e "s|@BACKEND@|${OMV_DEFAULT_BACKEND}|g" ${initldif}
+sed -i -e "s|@BACKENDOBJECTCLASS@|${OMV_DEFAULT_BACKENDOBJECTCLASS}|g" ${initldif}
+sed -i -e "s|@SUFFIX@|${OMV_DEFAULT_BASEDN}|g" ${initldif}
+sed -i -e "s|@PASSWORD@|${OMV_DEFAULT_PASSWORD}|g" ${initldif}
+
+#add slap.d config
+slapadd -F "${OMV_SLAPD_CONF_DIR}" -b "cn=config" -l "${initldif}"
+
+#add default directory
+slapadd -b "${OMV_DEFAULT_BASEDN}" -v -l /usr/share/slapd/omv-ldap-default.ldif
+
+chown -R ${OMV_LDAPUSER}:${OMV_LDAPGROUP} ${OMV_SLAPD_CONF_DIR}
+chown -R ${OMV_LDAPUSER}:${OMV_LDAPGROUP} ${OMV_LDAP_DB_DIR}
+
+service slapd start

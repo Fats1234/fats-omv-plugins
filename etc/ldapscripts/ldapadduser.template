@@ -1,0 +1,13 @@
+dn: uid=<user>,<usuffix>,<suffix>
+objectClass: inetOrgPerson
+objectClass: posixAccount
+cn: <user>
+sn: <user>
+uid: <user>
+uidNumber: <uid>
+gidNumber: <gid>
+homeDirectory: <home>
+loginShell: <shell>
+gecos: <user>
+description: User account
+mail: <user>@my-server.com

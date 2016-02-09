@@ -1,0 +1,28 @@
+Source: openmediavault-processlist
+Section: net
+XB-Plugin-Section: utilities
+Priority: optional
+Maintainer: <fatogre500@gmail.com>
+Build-Depends: debhelper (>= 2.0.11), openmediavault-ldap, slapd, ldap-utils, ldapscripts, php5-ldap
+Standards-Version: 3.9.3
+Homepage: http://omv-extras.org/
+
+Package: openmediavault-processlist
+Architecture: all
+Depends: ${misc:Depends}, openmediavault (>= 0.5), openmediavault (<< 0.6)
+Description: OpenMediaVault process list panel
+
+Package: openmediavault-ldapserver
+Version: 1.0-1
+Architecture: all
+Maintainer: Jason Lo <jasonl@polywell.com>
+Installed-Size: 286
+Depends: openmediavault (>= 2.0.11), krb5-user, krb5-clients, libpam-krb5, winbind, libnss-winbind
+Conflicts: openmediavault-ad
+Section: admin
+Priority: optional
+Homepage: http://www.openmediavault.org
+Description: OpenMediaVault Active Directory plugin provides a web interface for connecting to
+ a Windows Active Directory Server. This plugin adds user authentication support via 
+ Windows Active Directory Server.
+Plugin-Section: privilege

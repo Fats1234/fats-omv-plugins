@@ -1,0 +1,171 @@
+#!/bin/sh
+#
+# This file is part of OpenMediaVault.
+#
+# @license   http://www.gnu.org/licenses/gpl.html GPL Version 3
+# @author    Volker Theile <volker.theile@openmediavault.org>
+#                          <fatogre500@gmail.com>
+# @copyright Copyright (c) 2009-2015 Volker Theile
+#
+# OpenMediaVault is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# any later version.
+#
+# OpenMediaVault is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with OpenMediaVault. If not, see <http://www.gnu.org/licenses/>.
+
+set -e
+
+. /etc/default/openmediavault
+. /usr/share/openmediavault/scripts/helper-functions
+
+OMV_LDAPSCRIPTS_CONFIG=${OMV_LDAPSCRIPTS_CONFIG:-"/etc/ldapscripts/ldapscripts.conf"}
+OMV_LDAPSCRIPTS_PASSWD=${OMV_LDAPSCRIPTS_PASSWD:-"/etc/ldapscripts/ldapscripts.passwd"}
+OMV_TMP_LDAP_LDIF=${OMV_TMP_LDAP_LDIF:-"/tmp/ldap.ldif"}
+OMV_LDAP_DB_DIR=${OMV_LDAP_DB_DIR:-"/var/lib/ldap"}
+
+#Get the current base dn and root bind dn to see if we need to do major changes to ldap server config
+CURRENT_BASEDN=`cat ${OMV_LDAPSCRIPTS_CONFIG} | grep -Po '(?<=^SUFFIX=\").*(?=\"$)'`
+CURRENT_BINDCN=`cat ${OMV_LDAPSCRIPTS_CONFIG} | grep -Po '(?<=^BINDDN=\").*?(?=,)'`
+CURRENT_BINDPW=`cat ${OMV_LDAPSCRIPTS_PASSWD}`
+CURRENT_USUFFIX=`cat ${OMV_LDAPSCRIPTS_CONFIG} | grep -Po '(?<=^USUFFIX=\").*(?=\"$)'`
+CURRENT_GSUFFIX=`cat ${OMV_LDAPSCRIPTS_CONFIG} | grep -Po '(?<=^GSUFFIX=\").*(?=\"$)'`
+CONFIG_BASEDN=$(omv_config_get "//services/ldapserver/basedn")
+CONFIG_BINDCN=$(omv_config_get "//services/ldapserver/rootbindcn")
+CONFIG_BINDPW=$(omv_config_get "//services/ldapserver/rootbindpw")
+CONFIG_USUFFIX=$(omv_config_get "//services/ldapserver/usersuffix")
+CONFIG_GSUFFIX=$(omv_config_get "//services/ldapserver/groupsuffix")
+ORGANIZATION=`echo ${CONFIG_BASEDN} | grep -Po '(?<=^dc=).*?(?=,)|'`
+
+#Update the base DN if it has changed
+if [ "${CURRENT_BASEDN}" != "${CONFIG_BASEDN}" ]
+then
+
+   slapcat -v -b "${CURRENT_BASEDN}" -l ${OMV_TMP_LDAP_LDIF}
+
+   ldapmodify -H ldapi:/// -Y EXTERNAL << EOF
+dn: olcDatabase={1}hdb,cn=config
+changetype: modify
+replace: olcSuffix
+olcSuffix: ${CONFIG_BASEDN}
+EOF
+   
+   ldapmodify -H ldapi:/// -Y EXTERNAL <<  EOF
+dn: olcDatabase={1}hdb,cn=config
+changetype: modify
+replace: olcRootDN
+olcRootDN: ${CURRENT_BINDCN},${CONFIG_BASEDN}
+EOF
+
+   ldapmodify -H ldapi:/// -Y EXTERNAL << EOF
+dn: olcDatabase={1}hdb,cn=config
+changetype: modify
+replace: olcAccess
+olcAccess: {0}to attrs=userPassword,shadowLastChange by self write by anonymous auth by dn="${CURRENT_BINDCN},${CONFIG_BASEDN}" write by * none
+olcAccess: {1}to dn.base="" by * read
+olcAccess: {2}to * by dn="${CURRENT_BINDCN},${CONFIG_BASEDN}" write by * read
+EOF
+   
+   service slapd stop
+   rm -rf ${OMV_LDAP_DB_DIR}/*
+   
+   sed -i -e "s/o: .*/o: ${ORGANIZATION}/" ${OMV_TMP_LDAP_LDIF}
+   sed -i -e "s/dc: .*/dc: ${ORGANIZATION}/" ${OMV_TMP_LDAP_LDIF}
+   sed -i -e "s/${CURRENT_BASEDN}/${CONFIG_BASEDN}/g" ${OMV_TMP_LDAP_LDIF}
+   
+   slapadd -b "${CONFIG_BASEDN}" -v -l ${OMV_TMP_LDAP_LDIF}
+   rm -rf ${OMV_TMP_LDAP_LDIF}
+   chown -R `stat ${OMV_LDAP_DB_DIR} -c %u:%g` ${OMV_LDAP_DB_DIR}/*
+   service slapd start
+fi
+
+#Update the Root Bind DN if changed
+if [ "${CURRENT_BINDCN}" != "${CONFIG_BINDCN}" ]
+then
+   ldapmodify -H ldapi:/// -Y EXTERNAL << EOF
+dn: olcDatabase={1}hdb,cn=config
+changetype: modify
+replace: olcRootDN
+olcRootDN: ${CONFIG_BINDCN},${CONFIG_BASEDN}
+EOF
+   
+   ldapmodify -H ldapi:/// -Y EXTERNAL << EOF
+dn: olcDatabase={1}hdb,cn=config
+changetype: modify
+replace: olcAccess
+olcAccess: {0}to attrs=userPassword,shadowLastChange by self write by anonymous auth by dn="${CONFIG_BINDCN},${CONFIG_BASEDN}" write by * none
+olcAccess: {1}to dn.base="" by * read
+olcAccess: {2}to * by dn="${CONFIG_BINDCN},${CONFIG_BASEDN}" write by * read
+EOF
+   
+   ldapmodrdn -r -H ldap:// -x -D "${CONFIG_BINDCN},${CONFIG_BASEDN}" -w ${CURRENT_BINDPW} << EOF
+${CURRENT_BINDCN},${CONFIG_BASEDN}
+${CONFIG_BINDCN}
+EOF
+fi
+
+#Update the Root Bind DN Password if changed
+if [ "${CURRENT_BINDPW}" != "${CONFIG_BINDPW}" ]
+then
+   ldapmodify -H ldapi:/// -Y EXTERNAL << EOF
+dn: olcDatabase={1}hdb,cn=config
+changetype: modify
+replace: olcRootPW
+olcRootPW: `slappasswd -s ${CONFIG_BINDPW}`
+EOF
+fi
+
+#Update User Organizational Unit if changed
+if [ "${CURRENT_USUFFIX}" != "${CONFIG_USUFFIX}" ]
+then
+   ldapmodrdn -r -H ldap:// -x -D "${CONFIG_BINDCN},${CONFIG_BASEDN}" -w ${CONFIG_BINDPW} << EOF
+${CURRENT_USUFFIX},${CONFIG_BASEDN}
+${CONFIG_USUFFIX}
+EOF
+fi
+
+#Update Group Organizational Unit if changed
+if [ "${CURRENT_GSUFFIX}" != "${CONFIG_GSUFFIX}" ]
+then
+   ldapmodrdn -r -H ldap:// -x -D "${CONFIG_BINDCN},${CONFIG_BASEDN}" -w ${CONFIG_BINDPW} << EOF
+${CURRENT_GSUFFIX},${CONFIG_BASEDN}
+${CONFIG_GSUFFIX}
+EOF
+fi
+
+#Fill out the config for ldapscripts
+xmlstarlet sel -T -t \
+  -m "//services/ldapserver" \
+    -o "SERVER=localhost" -n \
+    -o "BINDPWDFILE='${OMV_LDAPSCRIPTS_PASSWD}'" -n \
+    -v "concat('SUFFIX=\"',basedn,'\"')" -n \
+    -v "concat('BINDDN=\"',rootbindcn,',',basedn,'\"')" -n \
+    -v "concat('USUFFIX=\"',usersuffix,'\"')" -n \
+    -v "concat('GSUFFIX=\"',groupsuffix,'\"')" -n \
+    -o "MSUFFIX='ou=Computers'" -n \
+    -o "GIDSTART=10000" -n \
+    -o "UIDSTART=10000" -n \
+    -o "MIDSTART=10000" -n \
+    -o "GCLASS='posixGroup'" -n \
+    -o "LDAPSEARCHBIN=\"/usr/bin/ldapsearch\"" -n \
+    -o "LDAPADDBIN=\"/usr/bin/ldapadd\"" -n \
+    -o "LDAPDELETEBIN=\"/usr/bin/ldapdelete\"" -n \
+    -o "LDAPMODIFYBIN=\"/usr/bin/ldapmodify\"" -n \
+    -o "LDAPMODRDNBIN=\"/usr/bin/ldapmodrdn\"" -n \
+    -o "LDAPPASSWDBIN=\"/usr/bin/ldappasswd\"" -n \
+    -o "UTEMPLATE=\"/etc/ldapscripts/ldapadduser.template\"" -n \
+  -b \
+  ${OMV_CONFIG_FILE} | xmlstarlet unesc > ${OMV_LDAPSCRIPTS_CONFIG}
+
+#Fill out the root bind password file for ldapscripts
+xmlstarlet sel -T -t\
+  -m "//services/ldapserver" \
+    -v rootbindpw \
+  -b \
+  ${OMV_CONFIG_FILE} | xmlstarlet unesc > ${OMV_LDAPSCRIPTS_PASSWD}

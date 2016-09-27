@@ -1,0 +1,106 @@
+#!/bin/sh
+#
+# This file is part of the Active Directory Plugin for OpenMediaVault.
+#
+# @license   http://www.gnu.org/licenses/gpl.html GPL Version 3
+# @author    Jason Lo <jason@oemproduction.com>
+#
+# OpenMediaVault is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# any later version.
+#
+# OpenMediaVault is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with OpenMediaVault. If not, see <http://www.gnu.org/licenses/>.
+
+set -e
+
+. /etc/default/openmediavault
+. /usr/share/openmediavault/scripts/helper-functions
+
+case "$1" in
+	configure)
+		########################################################################
+		# Set the default settings of the LDAP package to those expected by
+		# OpenMediaVault.
+		########################################################################
+		if [ -z "$2" ]; then
+			echo "Updating system environment ..."
+		fi
+
+		########################################################################
+		# Update the configuration.
+		# <config>
+		#   <services>
+		#     <ldapserver>
+		#       <enable>0</enable>
+		#       <basedn></basedn>
+		#       <rootbindcn></rootbindcn>
+		#       <rootbindpw></rootbindpw>
+		#       <usersuffix></usersuffix>
+		#       <groupsuffix></groupsuffix>
+		#     </ldapserver>
+		#   </services>
+		# </config>
+		########################################################################
+		if ! omv_config_exists "/config/services/ldapserver"; then
+			echo "Initialize configuration"
+			object="<enable>0</enable>"
+			object="${object}<basedn>dc=mynet,dc=local</basedn>"
+			object="${object}<rootbindcn>cn=admin</rootbindcn>"
+			object="${object}<rootbindpw>password</rootbindpw>"
+			object="${object}<usersuffix>ou=Users</usersuffix>"
+			object="${object}<groupsuffix>ou=Groups</groupsuffix>"
+			omv_config_add_element "/config/services" "ldapserver" "${object}" true
+		fi
+      
+		########################################################################
+		# Activate package triggers. These triggers are only set during the
+		# package installation.
+		########################################################################
+		dpkg-trigger update-fixperms
+		dpkg-trigger update-locale
+
+		########################################################################
+		# Action to be done depending on the previous version.
+		########################################################################
+		echo "Updating configuration ..."
+      
+      #############################################################################
+      # On Initial install, we have several things to do:
+      # 1. We need to replace "logname" with "whoami" in /usr/share/ldapscripts/runtime.
+      # Backup runtime first and the replace the keyword.
+      # 2. Then we need to configure the default ldap server settings
+      #############################################################################          
+      if [ -e "/tmp/omv-ldap-install" ] 
+      then
+         echo "Backing up /usr/share/ldapscripts/runtime to /etc/ldapscripts/runtime.org"
+		   cp /usr/share/ldapscripts/runtime /etc/ldapscripts/runtime.orig
+         echo "Replacing the keyword logname with whoami"
+         sed -i -e 's/logname/whoami/' /usr/share/ldapscripts/runtime
+         echo "Restoring OpenLDAP server to default settings"
+         /usr/share/slapd/omv/defaultldap
+         echo "copying the default ldapscripts configuration file"
+         cp /etc/ldapscripts/ldapscripts.default.conf /etc/ldapscripts/ldapscripts.conf
+         echo "Setting the default ldapscripts password"
+         echo -n "password" > /etc/ldapscripts/ldapscripts.passwd
+         rm /tmp/omv-ldap-install
+      fi
+      
+	;;
+
+	abort-upgrade|abort-remove|abort-deconfigure)
+	;;
+
+	*)
+		echo "postinst called with unknown argument '$1'" >&2
+		exit 1
+	;;
+esac
+
+exit 0

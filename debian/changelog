@@ -1,4 +1,15 @@
-openmediavault-ldapserver (1.0.0) stable; urgency=low
+openmediavault-ldapserver (1.0-7) UNRELEASED; urgency=low
 
-  * Initial release
+  * Add support for Samba Connections to LDAP
+  * Add some bugfixes for initial setup and clearing the LDAP
+  * Bug fix for setting/updating user passwords
+  * Bug fix for install 
+  * Initial ldif file now contains the samba schema and default indices
 
+ -- root <root@localhost.localdomain>  Fri, 23 Sep 2016 16:25:49 -0700
+
+openmediavault-ldapserver (1.0-1) unstable; urgency=low
+
+  * Initial release 
+
+ -- Jason Lo <jason@oemproduction.com>  Mon, 19 Sep 2016 11:38:12 -0700

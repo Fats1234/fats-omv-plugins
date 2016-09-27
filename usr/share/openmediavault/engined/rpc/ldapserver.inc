@@ -315,7 +315,8 @@ class OMVRpcServiceLDAPServer extends OMVRpcServiceAbstract
     * return None.
     **/
    function clearLdapServer($params, $context) {
-      $defaultLdapFilePath = "/usr/share/slapd/omv-ldap-default.ldif";
+      //bad hard code, need to change in future!
+      $defaultLdapFilePath = "/usr/share/slapd/omv/omv-ldap-default.ldif";
       $defaultLdapPassword = "password";
       // Validate the RPC caller context.
 		$this->validateMethodContext($context, array(
@@ -359,6 +360,7 @@ class OMVRpcServiceLDAPServer extends OMVRpcServiceAbstract
     **/
    private function restoreLdapServerFromFile($context,$filepath,$bindpw){
       global $xmlConfig;
+      //more hard code is bad!!
       $slapdInitLdif = "/usr/share/slapd/slapd.init.ldif";
       $defaultBackend = "hdb";
       $defaultBackendObjectClass = "olcHdbConfig";
@@ -407,6 +409,13 @@ class OMVRpcServiceLDAPServer extends OMVRpcServiceAbstract
                  $cmd, implode("\n", $output));
       }
       unlink($tmpFilePath);
+      
+      //slapadd the samba schema
+      $cmd = "slapadd -F \"/etc/ldap/slapd.d\" -b \"cn=config\" -l \"/etc/ldap/schema/samba.ldif\"";
+      if (0 !== $this->exec($cmd, $output)) {
+         throw new OMVException(OMVErrorMsg::E_EXEC_FAILED,
+                 $cmd, implode("\n", $output));
+      }
       
       //slapadd the directory
       $cmd = "slapadd -b \"$basedn\" -v -l $filepath";
@@ -467,11 +476,29 @@ class OMVRpcServiceLDAPServer extends OMVRpcServiceAbstract
                  $cmd, implode("\n", $output));
       }
       
+      //add the default indices
+      $cmd = "ldapmodify -Q -Y EXTERNAL -H ldapi:/// -f /usr/share/slapd/omv/samba_indices.ldif";
+      if (0 !== $this->exec($cmd, $output)) {
+         throw new OMVException(OMVErrorMsg::E_EXEC_FAILED,
+                 $cmd, implode("\n", $output));
+      }
+      
       // Apply the changes immediately (no user interaction is wanted).
       OMVRpc::exec("Config", "applyChanges", array(
                  "modules" => array("ldap","ldapserver"),
                  "force" => TRUE
       ), $context);
+      
+      //if samba is enabled, we need it to restart in order to auto update domain info.
+      $xpath = "//services/smb";
+		$smbObject = $xmlConfig->get($xpath);
+      if($smbObject['enable']){
+         $cmd = "service samba restart";
+         if (0 !== $this->exec($cmd, $output)) {
+            throw new OMVException(OMVErrorMsg::E_EXEC_FAILED,
+                  $cmd, implode("\n", $output));
+         }
+      }
    }
    
 }

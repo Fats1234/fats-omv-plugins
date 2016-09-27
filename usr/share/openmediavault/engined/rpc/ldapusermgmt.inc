@@ -169,6 +169,19 @@ class OMVRpcServiceLdapUserMgmt extends OMVRpcServiceAbstract {
       return in_array($gid,$ldapGroupGids);
    }
    
+   /**
+    * update the smb password
+    */
+   private function updateSambaPassword($username,$password){
+      $cmd = sprintf("export LANG=C; echo %s | smbpasswd -a %s -s 2>&1",
+        escapeshellarg($password."\n".$password),escapeshellarg($username));
+        
+      if(0 !== $this->exec($cmd, $output)) {
+			throw new OMVException(OMVErrorMsg::E_EXEC_FAILED,
+			  $cmd, implode("\n", $output));
+		}
+   }
+   
 	/**
 	 * Enumerate users.
 	 * @param type The user type, e.g. system, normal or all.
@@ -446,10 +459,9 @@ class OMVRpcServiceLdapUserMgmt extends OMVRpcServiceAbstract {
 					  }
 				  },
 				  "shell":{"type":"string","optional":true},
-				  "password":{"type":"string"},
+				  "password":{"type":"string","minLength":"5"},
 				  "email":{'.$GLOBALS['OMV_JSONSCHEMA_EMAIL'].'},
 				  "comment":{"type":"string","optional":true},
-				  "disallowusermod":{"type":"boolean"},
 				  "sshpubkeys":{
 					  "type":"array",
 					  "items":{'.$GLOBALS['OMV_JSONSCHEMA_SSHPUBKEY_RFC4716'].'}
@@ -523,6 +535,10 @@ class OMVRpcServiceLdapUserMgmt extends OMVRpcServiceAbstract {
 				  $cmd, implode("\n", $output));
 			}
 		}
+      
+      // Set Samba password
+      $this->updateSambaPassword($params['name'],$params['password']);
+      
       // Set User Password, Shell, Email and Comment
       $xpath = "//services/ldapserver";
       $ldapObj = $xmlConfig->get($xpath);
@@ -530,7 +546,7 @@ class OMVRpcServiceLdapUserMgmt extends OMVRpcServiceAbstract {
       $userObjectDN="uid=".$params['name'].",".$ldapObj['usersuffix'].",".$ldapObj['basedn'];
       //set password if specified
       if(!empty($params['password'])){
-         $encodedPassword = "{SHA}" . sha1( $params['password'], TRUE );
+         $encodedPassword = "{SHA}" . base64_encode( pack( "H*", sha1( $params['password'] ) ) );
          $info['userPassword']=$encodedPassword;
       }
       $info['gecos']=$params['comment'];
@@ -930,6 +946,7 @@ class OMVRpcServiceLdapUserMgmt extends OMVRpcServiceAbstract {
 		// Return the deleted configuration object.
 		return $object;
 	}
+   
 }
 
 // Register the RPC service.

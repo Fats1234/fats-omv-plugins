@@ -29,6 +29,7 @@ OMV_LDAPSCRIPTS_CONFIG=${OMV_LDAPSCRIPTS_CONFIG:-"/etc/ldapscripts/ldapscripts.c
 OMV_LDAPSCRIPTS_PASSWD=${OMV_LDAPSCRIPTS_PASSWD:-"/etc/ldapscripts/ldapscripts.passwd"}
 OMV_TMP_LDAP_LDIF=${OMV_TMP_LDAP_LDIF:-"/tmp/ldap.ldif"}
 OMV_LDAP_DB_DIR=${OMV_LDAP_DB_DIR:-"/var/lib/ldap"}
+OMV_NSSWITCH_CONFIG=${OMV_NSSWITCH_CONFIG:-"/etc/nsswitch.conf"}
 
 #Get the current base dn and root bind dn to see if we need to do major changes to ldap server config
 CURRENT_BASEDN=`cat ${OMV_LDAPSCRIPTS_CONFIG} | grep -Po '(?<=^SUFFIX=\").*(?=\"$)'`
@@ -169,3 +170,27 @@ xmlstarlet sel -T -t\
     -v rootbindpw \
   -b \
   ${OMV_CONFIG_FILE} | xmlstarlet unesc > ${OMV_LDAPSCRIPTS_PASSWD}
+
+#change nsswitch.conf to use support ldap groups/users so getent will show ldap groups and users
+xmlstarlet sel -t \
+  -i "//services/ldapserver/enable = '0'" \
+	-o "passwd:         compat" -n \
+	-o "group:          compat" -n \
+	-o "shadow:         compat" -n \
+  -b \
+  -i "//services/ldapserver/enable = '1'" \
+	-o "passwd:         files winbind ldap" -n \
+	-o "group:          files winbind ldap" -n \
+	-o "shadow:         files winbind ldap" -n \
+  -b \
+  -n \
+  -o "hosts:          files mdns4_minimal [NOTFOUND=return] dns mdns4" -n \
+  -o "networks:       files" -n \
+  -n \
+  -o "protocols:      db files" -n \
+  -o "services:       db files" -n \
+  -o "ethers:         db files" -n \
+  -o "rpc:            db files" -n \
+  -n \
+  -o "netgroup:       nis" \
+  ${OMV_CONFIG_FILE} | xmlstarlet unesc > ${OMV_NSSWITCH_CONFIG}  

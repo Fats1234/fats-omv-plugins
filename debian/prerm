@@ -20,13 +20,12 @@
 
 set -e
 
-. /etc/default/openmediavault
-. /usr/share/openmediavault/scripts/helper-functions
-
 case "$1" in
 	purge)
-		# Remove the configuration data
-		omv_config_delete "/config/services/ldapserver"
+		# Disable service.
+		omv_config_update "/config/services/ldapserver/enable" "0"
+		# Regenerate configuration files.
+		omv-mkconf ldapserver
 	;;
 
 	remove|upgrade|failed-upgrade|abort-install|abort-upgrade|disappear)
@@ -39,3 +38,4 @@ case "$1" in
 esac
 
 exit 0
+

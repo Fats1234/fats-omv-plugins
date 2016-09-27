@@ -1,0 +1,92 @@
+#basedn: dc=mynet,dc=local
+#bindcn: cn=admin
+#usersuffix: ou=Users
+#groupsuffix: ou=Groups
+dn: dc=mynet,dc=local
+objectClass: top
+objectClass: dcObject
+objectClass: organization
+o: mynet
+dc: mynet
+structuralObjectClass: organization
+entryUUID: d07e5a7c-55b8-1035-8fd2-7541509c8541
+creatorsName: cn=admin,dc=mynet,dc=local
+createTimestamp: 20160123010310Z
+entryCSN: 20160123010310.094962Z#000000#000#000000
+modifiersName: cn=admin,dc=mynet,dc=local
+modifyTimestamp: 20160123010310Z
+
+dn: cn=admin,dc=mynet,dc=local
+objectClass: simpleSecurityObject
+objectClass: organizationalRole
+cn: admin
+description: LDAP administrator
+userPassword:: e1NTSEF9bndabkJDMUdoU2dRQk9MK3VPMjhlbUJkdktIYkVLNXI=
+structuralObjectClass: organizationalRole
+entryUUID: d07f8c80-55b8-1035-8fd3-7541509c8541
+creatorsName: cn=admin,dc=mynet,dc=local
+createTimestamp: 20160123010310Z
+entryCSN: 20160123010310.102803Z#000000#000#000000
+modifiersName: cn=admin,dc=mynet,dc=local
+modifyTimestamp: 20160123010310Z
+
+dn: ou=Users,dc=mynet,dc=local
+objectClass: top
+objectClass: organizationalUnit
+ou: Users
+structuralObjectClass: organizationalUnit
+entryUUID: de3582a8-55b8-1035-8da2-0b16ede10bdf
+creatorsName: cn=admin,dc=mynet,dc=local
+createTimestamp: 20160123010333Z
+entryCSN: 20160123010333.105682Z#000000#000#000000
+modifiersName: cn=admin,dc=mynet,dc=local
+modifyTimestamp: 20160123010333Z
+
+dn: ou=Groups,dc=mynet,dc=local
+objectClass: top
+objectClass: organizationalUnit
+ou: Groups
+structuralObjectClass: organizationalUnit
+entryUUID: de35d550-55b8-1035-8da3-0b16ede10bdf
+creatorsName: cn=admin,dc=mynet,dc=local
+createTimestamp: 20160123010333Z
+entryCSN: 20160123010333.107802Z#000000#000#000000
+modifiersName: cn=admin,dc=mynet,dc=local
+modifyTimestamp: 20160123010333Z
+
+dn: ou=Computers,dc=mynet,dc=local
+objectClass: top
+objectClass: organizationalUnit
+ou: Computers
+structuralObjectClass: organizationalUnit
+entryUUID: de35ffda-55b8-1035-8da4-0b16ede10bdf
+creatorsName: cn=admin,dc=mynet,dc=local
+createTimestamp: 20160123010333Z
+entryCSN: 20160123010333.108896Z#000000#000#000000
+modifiersName: cn=admin,dc=mynet,dc=local
+modifyTimestamp: 20160123010333Z
+
+dn: ou=Idmap,dc=mynet,dc=local
+objectClass: organizationalUnit
+ou: Idmap
+structuralObjectClass: organizationalUnit
+entryUUID: de46b942-55b8-1035-8da5-0b16ede10bdf
+creatorsName: cn=admin,dc=mynet,dc=local
+createTimestamp: 20160123010333Z
+entryCSN: 20160123010333.218499Z#000000#000#000000
+modifiersName: cn=admin,dc=mynet,dc=local
+modifyTimestamp: 20160123010333Z
+
+dn: cn=ldapusers,ou=Groups,dc=mynet,dc=local
+objectClass: posixGroup
+cn: ldapusers
+gidNumber: 998
+description: Group account
+structuralObjectClass: posixGroup
+entryUUID: e7e072c2-55b8-1035-8da6-0b16ede10bdf
+creatorsName: cn=admin,dc=mynet,dc=local
+createTimestamp: 20160123010349Z
+entryCSN: 20160123010349.325439Z#000000#000#000000
+modifiersName: cn=admin,dc=mynet,dc=local
+modifyTimestamp: 20160123010349Z
+
